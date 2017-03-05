@@ -1,13 +1,14 @@
-name := "untitled"
+name := "tweets-analyzer"
 
 version := "1.0"
 
-scalaVersion := "2.10.6"
+scalaVersion := "2.11.8"
 
-libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.6" % "test"
-libraryDependencies += "org.apache.spark" % "spark-core_2.10" % "1.3.1"
-// https://mvnrepository.com/artifact/org.elasticsearch/elasticsearch-spark_2.10
-libraryDependencies += "org.elasticsearch" % "elasticsearch-spark_2.10" % "2.1.0.Beta3"
+// https://mvnrepository.com/artifact/org.apache.spark/spark-core_2.11
+libraryDependencies += "org.apache.spark" % "spark-core_2.11" % "2.1.0"
+
+// https://mvnrepository.com/artifact/org.elasticsearch/elasticsearch-spark-20_2.11
+libraryDependencies += "org.elasticsearch" % "elasticsearch-spark-20_2.11" % "5.2.1"
 
 
     
