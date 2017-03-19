@@ -75,6 +75,7 @@ object TweetsAnalyzer {
     val topHashtags = hashtags
       .map(tag => (tag, 1))
       .reduceByKey(_ + _)
+      .sortBy(_._2, false)
       .take(count)
       .map(_._1)
 
