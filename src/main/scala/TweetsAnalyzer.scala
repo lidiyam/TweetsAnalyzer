@@ -1,30 +1,46 @@
 import org.apache.spark.SparkConf
-import org.apache.spark.SparkContext
 import org.apache.spark.rdd._
 import org.elasticsearch.spark._
 import edu.stanford.nlp.simple._
-import edu.stanford.nlp.pipeline.{Annotation, StanfordCoreNLP}
-import edu.stanford.nlp.ling.CoreAnnotations
-import edu.stanford.nlp.neural.rnn.RNNCoreAnnotations
-import edu.stanford.nlp.sentiment.SentimentCoreAnnotations
-import java.util.Properties
 import java.util._
+
+import org.apache.spark.sql.SparkSession
+import training.{LogisticRegressionTrain, Record}
+
 import scala.collection.JavaConversions._
 
 object TweetsAnalyzer {
   case class Tweet(tweet_id: Long, text: String, language: String, timestamp: Date,
                    user_name: String, retweet_count: Long, hashtags: Array[String], sentiment: Double)
+  case class TopHashtag(hashtag: String, count: Int, sentiment: Double)
 
   def main(args: Array[String]) {
     val conf = new SparkConf().setAppName("Tweets Analyzer")
     conf.set("es.nodes", "localhost")
     conf.set("es.port", "9200")
     conf.set("es.index.auto.create", "true")
-    val sc = new SparkContext(conf)
 
-    val tweetsRDD = sc.esRDD("twitter_data/tweets")
+    val spark = SparkSession
+      .builder()
+      .appName("Tweets Analyzer")
+      .config(conf)
+      .getOrCreate()
+    val sc = spark.sparkContext
+
+    val tweetsRDD = sc.esRDD("twitter_data/tweets").cache()
 
     println(s"# of tweets: ${tweetsRDD.count()}")
+
+    //LogisticRegressionTrain.main(args)
+    import spark.implicits._
+    val lrModel = LogisticRegressionTrain.process(spark)
+    // testing
+    val positiveDF = sc.makeRDD(Seq(Record(-1.0D, "I love a cup of coffee on a rainy day"))).toDF
+    lrModel.transform(positiveDF).show()
+    val negativeDF = sc.makeRDD(Seq(Record(-1.0D, "I hate it"))).toDF
+    LogisticRegressionTrain.crossValidation(lrModel, negativeDF).show()
+
+    println("Logistic Regression done")
 
     val docs = tweetsRDD.map{ case (id, doc) => doc }
     val tweets = docs.map {
@@ -70,17 +86,15 @@ object TweetsAnalyzer {
     sentiments.sum / count
   }
 
-  def getTopHashtags(tweets: RDD[Tweet], count: Int): Array[(String, Double)] = {
-    val hashtags = tweets.flatMap(tweet => tweet.hashtags)
-    val topHashtags = hashtags
+  def getTopHashtags(tweets: RDD[Tweet], size: Int): Array[TopHashtag] = {
+    val topHashtags = tweets.flatMap(tweet => tweet.hashtags)
       .map(tag => (tag, 1))
       .reduceByKey(_ + _)
       .sortBy(_._2, false)
-      .take(count)
-      .map(_._1)
+      .take(size)
 
     topHashtags.map {
-      case tag => (tag, getSentiment(tag))
+      case (tag, count) => TopHashtag(tag, count, getSentiment(tag))
     }
   }
 
