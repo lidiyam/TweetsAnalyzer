@@ -3,25 +3,14 @@ package training
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.ml.feature.{CountVectorizer, RegexTokenizer, StopWordsRemover}
 import org.apache.spark.ml.classification.LogisticRegression
+import org.apache.spark.ml.evaluation.BinaryClassificationEvaluator
 import org.apache.spark.ml.{Pipeline, PipelineModel}
 
 case class Record(label: Double, text: String)
 
 object LogisticRegressionTrain {
 
-  def process(spark: SparkSession): PipelineModel = {
-
-    val sc = spark.sparkContext
-
-    val data = sc.textFile("/Users/lidiyam/Developer/tweets-analyzer/TweetsAnalyzer/data/training-data.txt")
-
-    import spark.implicits._
-
-    val trainingData = data.map(_.split("\t")).map {
-      case Array(label, text) => Record(label.toDouble, text)
-    }.toDF() // DataFrame will have columns "label" and "text"
-
-    trainingData.printSchema()
+  def pipelineSetup(spark: SparkSession): Pipeline = {
 
     val tokenizer = new RegexTokenizer()
       .setGaps(false)
@@ -49,14 +38,20 @@ object LogisticRegressionTrain {
 
     val pipeline = new Pipeline().setStages(Array(tokenizer, filterer, countVectorizer, lr))
 
-    pipeline.fit(trainingData)
-
+    pipeline
   }
 
-  def crossValidation(lrModel: PipelineModel, testDF: DataFrame) = {
-    //    todo: cross validation
-    //    val testDF = sc.makeRDD(Seq(Record(-1.0D, "I hate it"))).toDF
-    lrModel.transform(testDF)
+  def trainModel(trainingData: DataFrame, pipeline: Pipeline): PipelineModel = {
+    pipeline.fit(trainingData)
+  }
+
+  def evaluateModel(data: DataFrame, pipeline: Pipeline): Double = {
+    val Array(trainingData, testData) = data.randomSplit(Array(0.9, 0.1), seed = 12345)
+    val model = trainModel(trainingData, pipeline)
+
+    val evaluator = new BinaryClassificationEvaluator().setLabelCol("label")
+    val predictions = model.transform(testData)
+    evaluator.evaluate(predictions)
   }
 
 }

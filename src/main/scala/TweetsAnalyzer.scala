@@ -4,15 +4,18 @@ import org.elasticsearch.spark._
 import edu.stanford.nlp.simple._
 import java.util._
 
-import org.apache.spark.sql.SparkSession
-import training.{LogisticRegressionTrain, Record}
+import org.apache.spark.ml.PipelineModel
+import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.Row
+import training.LogisticRegressionTrain._
 
 import scala.collection.JavaConversions._
 
 object TweetsAnalyzer {
   case class Tweet(tweet_id: Long, text: String, language: String, timestamp: Date,
-                   user_name: String, retweet_count: Long, hashtags: Array[String], sentiment: Double)
+                   user_name: String, retweet_count: Long, hashtags: Array[String], sentiment: Double, positive: Boolean)
   case class TopHashtag(hashtag: String, count: Int, sentiment: Double)
+  case class Record(label: Double, text: String)
 
   def main(args: Array[String]) {
     val conf = new SparkConf().setAppName("Tweets Analyzer")
@@ -27,20 +30,24 @@ object TweetsAnalyzer {
       .getOrCreate()
     val sc = spark.sparkContext
 
-    val tweetsRDD = sc.esRDD("twitter_data/tweets").cache()
-
-    println(s"# of tweets: ${tweetsRDD.count()}")
-
-    //LogisticRegressionTrain.main(args)
     import spark.implicits._
-    val lrModel = LogisticRegressionTrain.process(spark)
-    // testing
-    val positiveDF = sc.makeRDD(Seq(Record(-1.0D, "I love a cup of coffee on a rainy day"))).toDF
-    lrModel.transform(positiveDF).show()
-    val negativeDF = sc.makeRDD(Seq(Record(-1.0D, "I hate it"))).toDF
-    LogisticRegressionTrain.crossValidation(lrModel, negativeDF).show()
 
-    println("Logistic Regression done")
+    val data = sc.textFile("/Users/lidiyam/Developer/tweets-analyzer/TweetsAnalyzer/data/training-data.txt")
+      .map(_.split("\t")).map {
+      case Array(label, text) => Record(label.toDouble, text)
+    }.toDF() // DataFrame will have columns "label" and "text"
+
+    val lrPipeline = pipelineSetup(spark)
+    val accuracy = evaluateModel(data, lrPipeline)
+
+    println(s"Logistic Regression accuracy: $accuracy")
+
+    // train model
+    val lrModel = trainModel(data, lrPipeline)
+
+    // get tweets from Elasticsearch
+    val tweetsRDD = sc.esRDD("twitter_data/tweets").cache()
+    println(s"# of tweets: ${tweetsRDD.count()}")
 
     val docs = tweetsRDD.map{ case (id, doc) => doc }
     val tweets = docs.map {
@@ -54,8 +61,9 @@ object TweetsAnalyzer {
 
         val hashtags = getHashtags(text)
         val sentiment = getSentiment(text)
+        val positive = getSentimentLR(sc.makeRDD(Seq(Record(-1.0D, text))).toDF, lrModel)
 
-        Tweet(tweet_id, text, lang, timestamp, username, retweet_count, hashtags, sentiment)
+        Tweet(tweet_id, text, lang, timestamp, username, retweet_count, hashtags, sentiment, positive)
       }
     }
 
@@ -98,4 +106,14 @@ object TweetsAnalyzer {
     }
   }
 
+  def getSentimentLR(textDF: DataFrame, lrModel: PipelineModel): Boolean = {
+    lrModel.transform(textDF).select("text", "prediction").collect()
+      .map{
+        case Row(text: String, prediction: Double) => {
+          println(s"tweet: $text")
+          println(s"prediction: $prediction")
+          (prediction == 1.0)
+        }
+      }.head
+  }
 }
