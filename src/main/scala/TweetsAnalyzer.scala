@@ -37,13 +37,7 @@ object TweetsAnalyzer {
       case Array(label, text) => Record(label.toDouble, text)
     }.toDF() // DataFrame will have columns "label" and "text"
 
-    val lrPipeline = pipelineSetup(spark)
-    val accuracy = evaluateModel(data, lrPipeline)
-
-    println(s"Logistic Regression accuracy: $accuracy")
-
-    // train model
-    val lrModel = trainModel(data, lrPipeline)
+    val lrModel = trainLRModel(spark, data)
 
     // get tweets from Elasticsearch
     val tweetsRDD = sc.esRDD("twitter_data/tweets").cache()
