@@ -32,7 +32,7 @@ object TweetsAnalyzer {
 
     import spark.implicits._
 
-    val data = sc.textFile("/Users/lidiyam/Developer/tweets-analyzer/TweetsAnalyzer/data/training-data.txt")
+    val data = sc.textFile("/opt/training-data.txt")
       .map(_.split("\t")).map {
       case Array(label, text) => Record(label.toDouble, text)
     }.toDF() // DataFrame will have columns "label" and "text"

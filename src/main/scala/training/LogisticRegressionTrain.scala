@@ -19,8 +19,7 @@ object LogisticRegressionTrain {
       .setInputCol("text")
       .setOutputCol("words")
 
-    val stopwords: Array[String] = spark.sparkContext.textFile("/Users/lidiyam/Developer/tweets-analyzer/TweetsAnalyzer/data/stopwords.txt")
-      .flatMap(_.stripMargin.split("\\s+")).collect ++ Array("rt")
+    val stopwords: Array[String] = StopWordsRemover.loadDefaultStopWords("english") ++ Array("rt")
 
     val filterer = new StopWordsRemover()
       .setStopWords(stopwords)
