@@ -16,4 +16,5 @@ assemblyMergeStrategy in assembly := {
   case x => MergeStrategy.first
 }
 
+javaOptions in assembly += "-Xmx2g"
     

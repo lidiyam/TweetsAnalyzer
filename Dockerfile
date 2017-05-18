@@ -20,7 +20,7 @@ WORKDIR /root
 # SparkContext web UI on 4040 -- only available for the duration of the application.
 # Spark master’s web UI on 8080.
 # Spark worker web UI on 8081.
-EXPOSE 4040 8080 8081
+EXPOSE 4040 8080 8081 9200 9300
 
 
 CMD ["/bin/bash"]
