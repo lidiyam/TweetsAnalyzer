@@ -47,7 +47,7 @@ object ESTweets {
         case row: Row => TweetRecord(row.getDouble(0), row.getString(1), row.getDouble(2))
       }
 
-    results.saveToEs("es_tweets2/sentiment")
+    results.saveToEs("es_tweets/sentiment")
 
   }
 

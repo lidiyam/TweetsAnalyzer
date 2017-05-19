@@ -17,7 +17,7 @@ object TrainModel {
 
     import spark.implicits._
 
-    val data = sc.textFile("/opt/training-data.txt")
+    val data = sc.textFile(args(0))
       .map(_.split("\t")).map {
       case Array(label, text) => Record(label.toDouble, text)
     }.toDF() // DataFrame will have columns "label" and "text"
